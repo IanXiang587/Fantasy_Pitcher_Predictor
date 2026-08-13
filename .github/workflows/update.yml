@@ -2,13 +2,16 @@ name: Fantasy Baseball Update
 
 on:
   schedule:
-    # Run every day at 11:00 UTC
+    # Daily update at 11:00 UTC
     - cron: "0 11 * * *"
+
+    # Weekly retraining every Wednesday at 12:00 UTC
+    - cron: "0 12 * * 3"
 
   workflow_dispatch:
 
 jobs:
-  daily-update:
+  update:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,6 +28,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run weekly retraining
+        if: github.event.schedule == '0 12 * * 3' || github.event_name == 'workflow_dispatch'
+        run: |
+          python src/weekly_update.py
+
       - name: Run daily update
         run: |
           python src/daily_update.py
+
+      - name: Commit updated predictions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/processed/latest_predictions.csv
+
+          git diff --cached --quiet || git commit -m "Update daily pitcher predictions"
+
+          git push
