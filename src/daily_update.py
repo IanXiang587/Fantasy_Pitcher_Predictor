@@ -3,6 +3,7 @@ import json
 
 import joblib
 import pandas as pd
+import numpy as np
 
 from src.data_pull import refresh_current_season_statcast, get_tomorrow_schedule
 from src.features import build_pitcher_games_table, add_pitch_mix_features, build_team_game_stats, add_team_rolling_features, add_opponent_features, add_rolling_features, add_historical_features, identify_starters, add_park_factors
@@ -146,6 +147,9 @@ def generate_predictions(feature_table, probable_pitchers, model, feature_cols):
                     location="Away",
                 )
 
+                away_features = away_features[feature_cols].copy()
+                away_features = away_features.apply(pd.to_numeric, errors="coerce")
+
                 prediction = float(model.predict(away_features)[0])
 
                 predictions.append(
@@ -174,6 +178,9 @@ def generate_predictions(feature_table, probable_pitchers, model, feature_cols):
                     feature_cols=feature_cols,
                     location="Home",
                 )
+
+                home_features = home_features[feature_cols].copy()
+                home_features = home_features.apply(pd.to_numeric, errors="coerce")
 
                 prediction = float(model.predict(home_features)[0])
 
