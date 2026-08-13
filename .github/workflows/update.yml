@@ -27,4 +27,4 @@ jobs:
 
       - name: Run daily update
         run: |
-          python src/daily_update.py
+          python -m src.daily_update
