@@ -7,5 +7,7 @@ data/raw/
 data/processed/
 !data/processed/
 !data/processed/latest_predictions.csv
-models/
+models/*
+!models/xgboost.pkl
+!models/model_features.json
 .env
