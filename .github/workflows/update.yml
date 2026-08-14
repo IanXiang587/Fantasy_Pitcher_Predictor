@@ -9,15 +9,15 @@ on:
     - cron: "0 12 * * 1"
 
   workflow_dispatch:
-  inputs:
-    update_type:
-      description: "Choose the update type"
-      required: true
-      default: "daily"
-      type: choice
-      options:
-        - daily
-        - weekly
+    inputs:
+      update_type:
+        description: "Choose the update type"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - weekly
 
 permissions:
   contents: write
@@ -50,11 +50,6 @@ jobs:
           python -m src.weekly_update
 
       - name: Run daily update
-        if: github.event_name == 'schedule' && github.event.schedule == '0 11 * * *'
-        run: |
-          python -m src.daily_update
-
-      - name: Run manually triggered update
         if: >
           github.event_name == 'schedule' &&
           github.event.schedule == '0 11 * * *' ||
