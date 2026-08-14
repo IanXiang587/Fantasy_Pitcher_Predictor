@@ -2,8 +2,11 @@ name: Fantasy Baseball Update
 
 on:
   schedule:
-    # Run every day at 11:00 UTC
+    # Daily prediction update — 11:00 UTC
     - cron: "0 11 * * *"
+
+    # Weekly model retraining — Monday at 12:00 UTC
+    - cron: "0 12 * * 1"
 
   workflow_dispatch:
 
@@ -11,7 +14,7 @@ permissions:
   contents: write
 
 jobs:
-  daily-update:
+  update:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,20 +31,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run weekly retraining
+        if: github.event_name == 'schedule' && github.event.schedule == '0 12 * * 1'
+        run: |
+          python -m src.weekly_update
+
       - name: Run daily update
+        if: github.event_name == 'schedule' && github.event.schedule == '0 11 * * *'
         run: |
           python -m src.daily_update
 
-      - name: Commit updated predictions
+      - name: Run manually triggered update
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python -m src.daily_update
+
+      - name: Commit updated data, predictions, and model
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add data/processed/latest_predictions.csv
+          git add data/processed/pitcher_games_features_base.csv
+          git add models/xgboost.pkl
+          git add models/model_features.json
 
           if git diff --cached --quiet; then
-            echo "No prediction changes to commit."
+            echo "No changes to commit."
           else
-            git commit -m "Update daily pitcher predictions"
+            git commit -m "Update pitcher predictions and model"
             git push
           fi
