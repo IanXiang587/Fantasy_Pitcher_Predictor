@@ -5,7 +5,7 @@ import joblib
 import pandas as pd
 import numpy as np
 
-from src.data_pull import refresh_current_season_statcast, get_tomorrow_schedule
+from src.data_pull import refresh_current_season_statcast, get_schedule
 from src.features import build_pitcher_games_table, add_pitch_mix_features, build_team_game_stats, add_team_rolling_features, add_opponent_features, add_rolling_features, add_historical_features, identify_starters, add_park_factors
 from src.predict import build_prediction_features
 
@@ -221,18 +221,41 @@ def main():
 
     model, feature_cols = load_model()
 
-    print("Getting tomorrow's MLB schedule...")
+    print("Getting today's MLB schedule...")
 
-    probable_pitchers = get_tomorrow_schedule(today)
+    today_schedule = get_schedule(today)
 
-    print(f"Tomorrow's games: {len(probable_pitchers)}")
+    print(f"Today's games: {len(today_schedule)}")
 
-    predictions = generate_predictions(
+    today_predictions = generate_predictions(
         feature_table=feature_table,
-        probable_pitchers=probable_pitchers,
+        probable_pitchers=today_schedule,
         model=model,
         feature_cols=feature_cols,
     )
+
+    if not today_predictions.empty:
+        today_predictions["prediction_for"] = "today"
+
+
+    print("Getting tomorrow's MLB schedule...")
+
+    tomorrow_schedule = get_schedule(tomorrow)
+
+    print(f"Tomorrow's games: {len(tomorrow_schedule)}")
+
+    tomorrow_predictions = generate_predictions(
+        feature_table=feature_table,
+        probable_pitchers=tomorrow_schedule,
+        model=model,
+        feature_cols=feature_cols,
+    )
+
+    if not tomorrow_predictions.empty:
+        tomorrow_predictions["prediction_for"] = "tomorrow"
+
+
+    predictions = pd.concat([today_predictions, tomorrow_predictions,],ignore_index=True,)
 
     predictions.to_csv(PREDICTIONS_PATH, index=False)
 

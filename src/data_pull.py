@@ -45,10 +45,7 @@ def refresh_current_season_statcast(season_start, end_date=None, lookback_days=3
 
         print(f"Downloading {season_start.date()} → {end_date.date()}")
 
-        df = statcast(
-            season_start.strftime("%Y-%m-%d"),
-            end_date.strftime("%Y-%m-%d"),
-        )
+        df = statcast(season_start.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
     else:
 
@@ -110,9 +107,9 @@ def save_model_results(df, model):
     print(f'Saving as {filename}')
     df.to_csv(PROCESSED_DATA / filename, index=False)
 
-def get_tomorrow_schedule(date=None):
+def get_schedule(date):
     """
-    Get tomorrow's MLB schedule and probable pitchers.
+    Get the MLB schedule and probable pitchers for a specific date.
 
     Returns one row per scheduled game with:
         game_date
@@ -125,18 +122,14 @@ def get_tomorrow_schedule(date=None):
     schedule_and_record() does not provide probable starters.
     """
 
-    if date is None:
-        date = pd.Timestamp.today().normalize()
-
     date = pd.Timestamp(date).normalize()
-    tomorrow = date + pd.Timedelta(days=1)
 
     url = "https://statsapi.mlb.com/api/v1/schedule"
 
     params = {
         "sportId": 1,
-        "date": tomorrow.strftime("%Y-%m-%d"),
-        "hydrate": "probablePitcher,team"
+        "date": date.strftime("%Y-%m-%d"),
+        "hydrate": "probablePitcher,team",
     }
 
     response = requests.get(url, params=params, timeout=30)
@@ -157,13 +150,12 @@ def get_tomorrow_schedule(date=None):
             away_team = away["team"]["abbreviation"]
             home_team = home["team"]["abbreviation"]
 
-            away_pitcher = (away.get("probablePitcher", {}).get("fullName"))
-
-            home_pitcher = (home.get("probablePitcher", {}).get("fullName"))
+            away_pitcher = away.get("probablePitcher", {}).get("fullName")
+            home_pitcher = home.get("probablePitcher", {}).get("fullName")
 
             games.append(
                 {
-                    "game_date": tomorrow,
+                    "game_date": date,
                     "away_team": away_team,
                     "home_team": home_team,
                     "away_pitcher": away_pitcher,
@@ -171,7 +163,24 @@ def get_tomorrow_schedule(date=None):
                 }
             )
 
-    if not games:
-        return pd.DataFrame(columns=["game_date", "away_team", "home_team", "away_pitcher", "home_pitcher"])
+    columns = ["game_date", "away_team", "home_team", "away_pitcher", "home_pitcher"]
 
-    return pd.DataFrame(games).sort_values(["game_date", "away_team", "home_team"]).reset_index(drop=True)
+    if not games:
+        return pd.DataFrame(columns=columns)
+
+    return (pd.DataFrame(games).sort_values(["game_date", "away_team", "home_team"]).reset_index(drop=True))
+
+
+def get_tomorrow_schedule(date=None):
+    """
+    Get tomorrow's MLB schedule and probable pitchers.
+
+    Kept as a compatibility wrapper around get_schedule().
+    """
+
+    if date is None:
+        date = pd.Timestamp.today().normalize()
+
+    date = pd.Timestamp(date).normalize()
+
+    return get_schedule(date + pd.Timedelta(days=1))
