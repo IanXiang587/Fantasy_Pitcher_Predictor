@@ -44,32 +44,46 @@ st.caption("Powered by an XGBoost model trained on 2026 MLB data.")
 
 predictions = load_latest_predictions()
 
-if not predictions.empty:
-    prediction_date = predictions["game_date"].iloc[0]
-
-    st.subheader(f"Predictions for {prediction_date.strftime('%B %d, %Y')}")
 
 if predictions.empty:
     st.info("No daily predictions are currently available.")
 
 else:
-    predictions = predictions.sort_values("projected_strikeouts", ascending=False)
+    def display_daily_predictions(df, title):
+        if df.empty:
+            st.info(f"No predictions available for {title.lower()}.")
+            return
 
-    display_predictions = predictions[["pitcher", "team", "opponent", "location", "projected_strikeouts"]].copy()
+        df = df.sort_values("projected_strikeouts", ascending=False)
 
-    display_predictions["projected_strikeouts"] = (display_predictions["projected_strikeouts"].round(1))
+        display_predictions = df[["pitcher", "team", "opponent", "location", "projected_strikeouts"]].copy()
 
-    display_predictions["Recommendation"] = (display_predictions["projected_strikeouts"].apply(lambda x: "START" if x >= 5.0 else "SIT"))
+        display_predictions["projected_strikeouts"] = (display_predictions["projected_strikeouts"].round(1))
 
-    st.dataframe(display_predictions, use_container_width=True, hide_index=True)
+        display_predictions["Recommendation"] = (display_predictions["projected_strikeouts"].apply(lambda x: "START" if x >= 5.0 else "SIT"))
 
+        st.subheader(title)
+
+        st.dataframe(display_predictions, use_container_width=True, hide_index=True)
+
+
+    today_predictions = predictions[predictions["prediction_for"] == "today"].copy()
+
+    tomorrow_predictions = predictions[predictions["prediction_for"] == "tomorrow"].copy()
+
+
+    if not today_predictions.empty:
+        today_date = today_predictions["game_date"].iloc[0]
+        display_daily_predictions(today_predictions, f"Today's Predictions — {today_date.strftime('%B %d, %Y')}",)
+
+
+    if not tomorrow_predictions.empty:
+        tomorrow_date = tomorrow_predictions["game_date"].iloc[0]
+        display_daily_predictions(tomorrow_predictions, f"Tomorrow's Predictions — {tomorrow_date.strftime('%B %d, %Y')}",)
 
 with st.expander("About the model"):
 
-    st.write(
-        "The model uses pitcher performance, recent form, opponent "
-        "offense, rest, and park factors to predict strikeouts."
-    )
+    st.write("The model uses pitcher performance, recent form, opponent offense, rest, and park factors to predict strikeouts.")
 
     col1, col2, col3 = st.columns(3)
 
@@ -102,11 +116,11 @@ game_date = st.date_input("Game Date")
 if st.button("Predict Strikeouts", type="primary", use_container_width=True,):
     try:
         prediction = predict_pitcher(
-        historical_data=historical_data,
-        pitcher_name=pitcher,
-        opponent=opponent,
-        game_date=game_date,
-        location=location,
+            historical_data=historical_data,
+            pitcher_name=pitcher,
+            opponent=opponent,
+            game_date=game_date,
+            location=location,
         )
 
         prediction = max(0, prediction)
@@ -115,13 +129,13 @@ if st.button("Predict Strikeouts", type="primary", use_container_width=True,):
 
         st.subheader("Prediction")
 
-        st.metric("Projected Strikeouts", f"{prediction:.1f}",)
-
+        st.metric("Projected Strikeouts", f"{prediction:.1f}")
 
         if prediction >= 5.0:
             st.success(f"🟢 START — projected {prediction:.1f} Ks")
 
         else:
+
             st.warning(f"🟡 SIT — projected {prediction:.1f} Ks")
 
 
