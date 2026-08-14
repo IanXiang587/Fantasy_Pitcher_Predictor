@@ -9,6 +9,15 @@ on:
     - cron: "0 12 * * 1"
 
   workflow_dispatch:
+  inputs:
+    update_type:
+      description: "Choose the update type"
+      required: true
+      default: "daily"
+      type: choice
+      options:
+        - daily
+        - weekly
 
 permissions:
   contents: write
@@ -32,7 +41,11 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run weekly retraining
-        if: github.event_name == 'schedule' && github.event.schedule == '0 12 * * 1'
+        if: >
+          github.event_name == 'schedule' &&
+          github.event.schedule == '0 12 * * 1' ||
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.update_type == 'weekly'
         run: |
           python -m src.weekly_update
 
@@ -42,7 +55,11 @@ jobs:
           python -m src.daily_update
 
       - name: Run manually triggered update
-        if: github.event_name == 'workflow_dispatch'
+        if: >
+          github.event_name == 'schedule' &&
+          github.event.schedule == '0 11 * * *' ||
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.update_type == 'daily'
         run: |
           python -m src.daily_update
 
