@@ -9,6 +9,23 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 
 PREDICTIONS_PATH = PROJECT_ROOT / "data" / "processed" / "latest_predictions.csv"
 
+REQUIRED_PREDICTION_COLUMNS = [
+    "game_date",
+    "pitcher",
+    "team",
+    "opponent",
+    "location",
+    "strikeouts",
+    "outs",
+    "hits",
+    "earned_runs",
+    "walks",
+    "hit_batters",
+    "win_probability",
+    "projected_points",
+    "prediction_for",
+]
+
 st.set_page_config(page_title="Fantasy Pitcher Predictor", page_icon="⚾", layout="wide")
 
 @st.cache_data(ttl=300)
@@ -86,23 +103,6 @@ def calculate_custom_points(row, scoring):
     return calculate_points(prediction_dict, scoring=scoring)
 
 predictions = load_latest_predictions()
-
-REQUIRED_PREDICTION_COLUMNS = [
-    "game_date",
-    "pitcher",
-    "team",
-    "opponent",
-    "location",
-    "strikeouts",
-    "outs",
-    "hits",
-    "earned_runs",
-    "walks",
-    "hit_batters",
-    "win_probability",
-    "projected_points",
-    "prediction_for",
-]
 
 st.title("⚾ Fantasy Pitcher Predictor")
 
