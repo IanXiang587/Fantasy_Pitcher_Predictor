@@ -394,30 +394,34 @@ def add_win_probability_features(pitcher_games, team_games, bullpen_games):
     team_games = team_games.copy()
     bullpen_games = bullpen_games.copy()
 
+    pitcher_games["game_date"] = pd.to_datetime(pitcher_games["game_date"], errors="coerce")
+    team_games["game_date"] = pd.to_datetime(team_games["game_date"], errors="coerce")
+    bullpen_games["game_date"] = pd.to_datetime(bullpen_games["game_date"], errors="coerce")
+
+    if pitcher_games["game_date"].isna().any():
+        raise ValueError("pitcher_games contains invalid game_date values.")
+    if team_games["game_date"].isna().any():
+        raise ValueError("team_games contains invalid game_date values.")
+    if bullpen_games["game_date"].isna().any():
+        raise ValueError( "bullpen_games contains invalid game_date values." )
+
     team_features = team_games[["game_date", "game_pk", "team", "runs_last14"]].copy()
-
-    team_features = team_features.rename(columns={"team": "pitcher_team", "runs_last14": "team_runs_last14",})
-
-    pitcher_games = pitcher_games.merge(team_features, on=["game_date", "game_pk", "pitcher_team",], how="left")
+    team_features = team_features.rename(columns={"team": "pitcher_team", "runs_last14": "team_runs_last14"})
+    pitcher_games = pitcher_games.merge(team_features, on=["game_date", "game_pk", "pitcher_team"], how="left")
 
     opponent_features = team_games[["game_date", "game_pk", "team", "runs_last14"]].copy()
-
     opponent_features = opponent_features.rename(columns={"team": "opponent", "runs_last14": "opp_team_runs_last14"})
-
     pitcher_games = pitcher_games.merge(opponent_features, on=["game_date", "game_pk", "opponent"], how="left")
 
-    bullpen_features = bullpen_games.rename(columns={"pitcher_team": "pitcher_team"})
-
+    bullpen_features = bullpen_games[["game_date", "game_pk", "pitcher_team", "bullpen_era_last14", "bullpen_fip_last14"]].copy()
     pitcher_games = pitcher_games.merge(bullpen_features, on=["game_date", "game_pk", "pitcher_team"], how="left")
 
-    opponent_bullpen = bullpen_games.rename(columns={"pitcher_team": "opponent", "bullpen_era_last14": "opp_bullpen_era_last14", "bullpen_fip_last14": "opp_bullpen_fip_last14",})
-
-    pitcher_games = pitcher_games.merge(opponent_bullpen, on=["game_date", "game_pk", "opponent"], how="left",)
+    opponent_bullpen = bullpen_games[["game_date", "game_pk", "pitcher_team", "bullpen_era_last14", "bullpen_fip_last14"]].copy()
+    opponent_bullpen = opponent_bullpen.rename(columns={"pitcher_team": "opponent", "bullpen_era_last14": "opp_bullpen_era_last14", "bullpen_fip_last14": "opp_bullpen_fip_last14"})
+    pitcher_games = pitcher_games.merge(opponent_bullpen, on=["game_date", "game_pk", "opponent"], how="left")
 
     pitcher_games["run_support_diff"] = (pitcher_games["team_runs_last14"] - pitcher_games["opp_team_runs_last14"])
-
     pitcher_games["bullpen_era_diff"] = (pitcher_games["opp_bullpen_era_last14"] - pitcher_games["bullpen_era_last14"])
-
     pitcher_games["bullpen_fip_diff"] = (pitcher_games["opp_bullpen_fip_last14"] - pitcher_games["bullpen_fip_last14"])
 
     return pitcher_games
