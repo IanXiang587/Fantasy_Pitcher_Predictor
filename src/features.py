@@ -4,9 +4,7 @@ import numpy as np
 
 
 def build_pitcher_games_table(statcast_df):
-    """
-    Aggregate Statcast pitch-level data into one row per pitcher appearance.
-    """
+    """Aggregate Statcast pitch-level data into one row per pitcher appearance."""
 
     df = statcast_df.copy()
 
@@ -65,10 +63,9 @@ def add_rolling_features(df):
 
     df = df.copy()
 
-    # Ensure chronological order
     df["game_date"] = pd.to_datetime(df["game_date"])
 
-    df = df.sort_values(["pitcher", "game_date"])
+    df = df.sort_values(["pitcher", "game_date", "game_pk"])
 
     group = df.groupby("pitcher")
 
@@ -116,25 +113,18 @@ def identify_starters(df):
 
 
 def add_pitch_mix_features(statcast_df, pitcher_games):
-    """
-    Add pitch usage percentages for each pitcher appearance.
-    """
+    """Add pitch usage percentages for each pitcher appearance."""
 
     pitch_counts = ( statcast_df .groupby( [ "game_pk", "pitcher", "pitch_type" ] ) .size() .reset_index(name="pitch_count") )
 
-    # Calculate total pitches per pitcher/game
     pitch_counts["total_pitches"] = ( pitch_counts .groupby( [ "game_pk", "pitcher" ] )["pitch_count"] .transform("sum") )
 
-    # Convert counts to usage percentages
     pitch_counts["usage"] = ( pitch_counts["pitch_count"] / pitch_counts["total_pitches"] )
 
-    # Pivot pitch types into columns
     pitch_mix = ( pitch_counts .pivot_table( index=[ "game_pk", "pitcher" ], columns="pitch_type", values="usage", fill_value=0 ) .reset_index() )
 
-    #rename columns
     pitch_mix.columns = [ f"{col}_usage" if col not in ["game_pk", "pitcher"] else col for col in pitch_mix.columns ]
 
-    # Merge into pitcher-game table
     pitcher_games = pitcher_games.merge( pitch_mix, on=[ "game_pk", "pitcher" ], how="left" )
 
     return pitcher_games
@@ -144,16 +134,13 @@ def build_team_game_stats(statcast_df):
 
     df = statcast_df.copy()
 
-    # Only completed plate appearances
     pa_events = df[df["events"].notna()].copy()
 
-    # Home team perspective
     home = pa_events.copy()
     home["team"] = home["home_team"]
     home["opponent"] = home["away_team"]
     home["runs"] = home["home_score"]
 
-    # Away team perspective
     away = pa_events.copy()
     away["team"] = away["away_team"]
     away["opponent"] = away["home_team"]
@@ -161,8 +148,6 @@ def build_team_game_stats(statcast_df):
 
     batting = pd.concat([home, away])
 
-
-    # Offensive indicators
     batting["hit"] = batting["events"].isin(["single", "double", "triple", "home_run"])
 
     batting["home_run"] = batting["events"].eq("home_run")
@@ -185,8 +170,6 @@ def build_team_game_stats(statcast_df):
         .reset_index()
     )
 
-
-    # Rate statistics
     team_games["k_rate"] = (team_games["strikeouts"] / team_games["plate_appearances"])
 
     team_games["bb_rate"] = (team_games["walks"] / team_games["plate_appearances"])
@@ -200,7 +183,7 @@ def build_team_game_stats(statcast_df):
 
 def add_team_rolling_features(team_games):
 
-    team_games = team_games.sort_values(["team", "game_date"])
+    team_games = team_games.sort_values(["team", "game_date", "game_pk"])
 
     metrics = ["runs", "k_rate", "bb_rate", "hr_rate", "iso"]
 
@@ -208,8 +191,6 @@ def add_team_rolling_features(team_games):
         team_games[f"{metric}_last14"] = (team_games.groupby("team")[metric].transform(lambda x: x.shift(1).rolling(14,min_periods=3).mean()))
 
     return team_games
-
-import pandas as pd
 
 
 def add_historical_features(df, columns, rolling_windows=(3, 5)):
@@ -219,22 +200,20 @@ def add_historical_features(df, columns, rolling_windows=(3, 5)):
 
     df = df.copy()
 
-    # Ensure chronological order
-    df = df.sort_values(["pitcher", "game_date"])
+    df = df.sort_values(["pitcher", "game_date", "game_pk"])
 
     grouped = df.groupby("pitcher")
 
     for col in columns:
-        # Previous game value
         df[f"last_{col}"] = (grouped[col].shift(1))
 
-        # Rolling averages
-        for window in rolling_windows:df[f"rolling{window}_{col}"] = (grouped[col].shift(1).rolling(window, min_periods=1).mean().reset_index(level=0, drop=True))
+        for window in rolling_windows:
+            df[f"rolling{window}_{col}"] = (grouped[col].shift(1).rolling(window, min_periods=1).mean().reset_index(level=0, drop=True))
 
-        # Season-to-date average
         df[f"season_{col}"] = (grouped[col].shift(1).expanding().mean().reset_index(level=0, drop=True))
 
     return df
+
 
 def add_opponent_features(pitcher_games, team_games):
     """
@@ -250,7 +229,6 @@ def add_opponent_features(pitcher_games, team_games):
     pitcher_games["game_date"] = pd.to_datetime(pitcher_games["game_date"])
     team_games["game_date"] = pd.to_datetime(team_games["game_date"])
 
-    # Merge the opponent's pregame offensive metrics.
     opponent_features = team_games[
         [
             "game_date",
@@ -295,6 +273,7 @@ def add_opponent_features(pitcher_games, team_games):
     )
 
     return pitcher_games
+
 
 def add_park_factors(pitcher_games):
     """
@@ -353,5 +332,92 @@ def add_park_factors(pitcher_games):
     )
 
     pitcher_games = pitcher_games.merge(park_factor_df, on="home_team", how="left")
+
+    return pitcher_games
+
+
+def add_bullpen_features(pitcher_games, pitching_targets):
+    """
+    Calculate bullpen ERA/FIP features.
+
+    Bullpen statistics for a game are calculated from relief pitchers only.
+    """
+
+    pitcher_games = pitcher_games.copy()
+    pitching_targets = pitching_targets.copy()
+
+    pitcher_games["game_date"] = pd.to_datetime(pitcher_games["game_date"])
+
+    target_team_info = pitcher_games[["game_pk", "pitcher", "game_date", "pitcher_team", "is_starter"]].copy()
+
+    bullpen = pitching_targets.merge(target_team_info, on=["game_pk", "pitcher"], how="left")
+
+    bullpen = bullpen[bullpen["pitcher_team"].notna()].copy()
+
+    bullpen = bullpen[bullpen["is_starter"] == 0].copy()
+
+    bullpen_game = (bullpen.groupby(["game_date","game_pk","pitcher_team",])
+        .agg(
+            bullpen_outs=("outs", "sum"),
+            bullpen_er=("earned_runs", "sum"),
+            bullpen_bb=("walks", "sum"),
+            bullpen_hbp=("hit_batters", "sum"),
+            bullpen_k=("strikeouts_official", "sum"),
+            bullpen_hr=("home_runs_allowed", "sum"),
+        )
+        .reset_index()
+    )
+
+    bullpen_game["bullpen_ip"] = (bullpen_game["bullpen_outs"] / 3.0)
+
+    bullpen_game["bullpen_era"] = np.where(bullpen_game["bullpen_ip"] > 0,(bullpen_game["bullpen_er"] / bullpen_game["bullpen_ip"]) * 9, np.nan,)
+
+    bullpen_game["bullpen_fip"] = np.where(bullpen_game["bullpen_ip"] > 0,((13 * bullpen_game["bullpen_hr"] + 3 * (bullpen_game["bullpen_bb"] + bullpen_game["bullpen_hbp"]) - 2 * bullpen_game["bullpen_k"]) / bullpen_game["bullpen_ip"]), np.nan)
+
+    bullpen_game = bullpen_game.sort_values(["pitcher_team", "game_date", "game_pk"])
+
+    group = bullpen_game.groupby("pitcher_team")
+
+    bullpen_game["bullpen_era_last14"] = (group["bullpen_era"].transform(lambda x: x.shift(1).rolling(14, min_periods=3).mean()))
+
+    bullpen_game["bullpen_fip_last14"] = (group["bullpen_fip"].transform(lambda x: x.shift(1).rolling(14, min_periods=3).mean()))
+
+    return bullpen_game[["game_date", "game_pk", "pitcher_team", "bullpen_era_last14", "bullpen_fip_last14"]]
+
+
+def add_win_probability_features(pitcher_games, team_games, bullpen_games):
+    """
+    Add team and bullpen features.
+    """
+
+    pitcher_games = pitcher_games.copy()
+    team_games = team_games.copy()
+    bullpen_games = bullpen_games.copy()
+
+    team_features = team_games[["game_date", "game_pk", "team", "runs_last14"]].copy()
+
+    team_features = team_features.rename(columns={"team": "pitcher_team", "runs_last14": "team_runs_last14",})
+
+    pitcher_games = pitcher_games.merge(team_features, on=["game_date", "game_pk", "pitcher_team",], how="left")
+
+    opponent_features = team_games[["game_date", "game_pk", "team", "runs_last14"]].copy()
+
+    opponent_features = opponent_features.rename(columns={"team": "opponent", "runs_last14": "opp_team_runs_last14"})
+
+    pitcher_games = pitcher_games.merge(opponent_features, on=["game_date", "game_pk", "opponent"], how="left")
+
+    bullpen_features = bullpen_games.rename(columns={"pitcher_team": "pitcher_team"})
+
+    pitcher_games = pitcher_games.merge(bullpen_features, on=["game_date", "game_pk", "pitcher_team"], how="left")
+
+    opponent_bullpen = bullpen_games.rename(columns={"pitcher_team": "opponent", "bullpen_era_last14": "opp_bullpen_era_last14", "bullpen_fip_last14": "opp_bullpen_fip_last14",})
+
+    pitcher_games = pitcher_games.merge(opponent_bullpen, on=["game_date", "game_pk", "opponent"], how="left",)
+
+    pitcher_games["run_support_diff"] = (pitcher_games["team_runs_last14"] - pitcher_games["opp_team_runs_last14"])
+
+    pitcher_games["bullpen_era_diff"] = (pitcher_games["opp_bullpen_era_last14"] - pitcher_games["bullpen_era_last14"])
+
+    pitcher_games["bullpen_fip_diff"] = (pitcher_games["opp_bullpen_fip_last14"] - pitcher_games["bullpen_fip_last14"])
 
     return pitcher_games
