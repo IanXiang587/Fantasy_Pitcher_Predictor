@@ -10,4 +10,11 @@ data/processed/
 models/*
 !models/xgboost.pkl
 !models/model_features.json
+!models/outs_model.pkl
+!models/hits_model.pkl
+!models/er_model.pkl
+!models/bb_model.pkl
+!models/hbp_model.pkl
+!models/win_model.pkl
+!models/win_model_features.json
 .env
