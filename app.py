@@ -114,7 +114,7 @@ if predictions.empty:
     st.warning("No daily predictions are currently available.")
     st.stop()
 
-matchup_tab, browser_tab = st.tabs(["🎯 Matchup Predictor", "📊 Stat Browser"])
+browser_tab, matchup_tab = st.tabs(["📊 Stat Browser", "🎯 Matchup Predictor"])
 
 with matchup_tab:
     st.header("Matchup Predictor")
