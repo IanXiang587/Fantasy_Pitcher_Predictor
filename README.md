@@ -1,64 +1,266 @@
-# Fantasy Pitcher Strikeout Predictor
+# ⚾ Fantasy Pitcher Predictor
 
-An end-to-end machine learning project that predicts how many strikeouts an MLB pitcher is expected to record in an upcoming start.
+A machine-learning application that predicts MLB starting pitcher performance for upcoming games.
 
-The project combines MLB Statcast data, pitcher recent-form metrics, opponent offensive performance, rest, and park factors to produce strikeout predictions and a simple fantasy **START/SIT** recommendation.
+The project uses MLB Statcast data, official pitching results, team offensive performance, pitcher recent form, park factors, bullpen performance, and other matchup features to generate predictions for upcoming MLB games.
 
-The system is designed as a complete automated pipeline:
-
-- Current-season MLB data ingestion
-- Leakage-safe feature engineering
-- XGBoost strikeout prediction
-- Time-based model evaluation
-- Historical backtesting
-- Automated daily predictions
-- Weekly model retraining
-- GitHub Actions scheduling
-- Streamlit deployment
+The application is designed to provide useful pitcher projections without requiring a specific fantasy league scoring system.
 
 ---
 
-## Project Goal
+## Features
 
-The goal is to answer a practical fantasy baseball question:
+The application currently provides:
 
-> **Given a pitcher and an upcoming matchup, how many strikeouts should we expect, and is the matchup worth starting the pitcher?**
-
-Rather than stopping at model training, this project implements the complete workflow from raw MLB data through automated predictions and a deployed web application.
+- Projected strikeouts
+- Projected outs
+- Projected hits allowed
+- Projected earned runs
+- Projected walks
+- Projected hit batters
+- Team win probability
+- Projected fantasy points
+- Start/Sit recommendations
+- Predictions for today's games
+- Predictions for tomorrow's games
+- Manual pitcher matchup predictions
+- Model evaluation metrics
+- Automated daily data updates
+- Automated weekly model retraining
 
 ---
 
-## System Architecture
+## How It Works
+
+The project follows an automated machine-learning pipeline:
 
 ```text
-                    MLB / Statcast Data
-                           |
-                           v
-                  Data Refresh Pipeline
-                           |
-                           v
-                 Feature Engineering
-                           |
-                           v
-              Leakage-Safe Feature Table
-                           |
-              +------------+------------+
-              |                         |
-              v                         v
-       Daily Prediction             Weekly Retraining
-              |                         |
-              v                         v
-     Today + Tomorrow             XGBoost Model
-        Predictions                     |
-              |                         |
-              +------------+------------+
-                           |
-                           v
-                latest_predictions.csv
-                           |
-                           v
-                     Streamlit App
+MLB Statcast Data
+       |
+       v
+Data Cleaning & Aggregation
+       |
+       v
+Pitcher Game-Level Features
+       |
+       v
+Rolling / Historical Features
+       |
+       v
+Opponent & Team Features
+       |
+       v
+Park Factors
+       |
+       v
+Bullpen Features
+       |
+       v
+Training Targets
+       |
+       v
+Machine Learning Models
+       |
+       v
+Upcoming Game Predictions
+       |
+       v
+Streamlit Application
 ```
+
+---
+
+## Data
+
+The primary data source is MLB Statcast data accessed through `pybaseball`.
+
+The project also uses MLB schedule and pitching information to identify upcoming games and probable pitchers.
+
+The current pipeline is configured for the **2026 MLB season**.
+
+### Main Data Components
+
+- Pitch-level Statcast data
+- Pitcher game logs
+- Team offensive statistics
+- Opponent offensive performance
+- Pitcher rolling statistics
+- Pitch mix characteristics
+- Pitch velocity and spin
+- Called strikes and whiffs
+- Rest days
+- Park factors
+- Bullpen performance
+- Official pitching results
+
+---
+
+## Feature Engineering
+
+Features are designed to use information that would have been available before the predicted game.
+
+### Pitcher Performance
+
+Examples include:
+
+- Recent strikeouts
+- Recent pitch count
+- Average velocity
+- Average spin rate
+- Pitch movement
+- Called-strike rate
+- Whiffs
+- CSW
+- Recent performance trends
+- Historical averages
+- Standard deviations
+- Rest days
+
+### Opponent Features
+
+The model incorporates recent opponent offensive performance, including statistics such as:
+
+- Runs
+- Strikeout rate
+- Walk rate
+- Home run rate
+- Isolated power
+- wOBA and other offensive-strength metrics
+
+### Team and Win-Probability Features
+
+The win-probability model additionally uses:
+
+- Team recent scoring
+- Opponent recent scoring
+- Bullpen ERA
+- Bullpen FIP
+- Pitcher matchup differences
+- Recent pitcher performance differences
+- Team and opponent matchup information
+
+### Park Factors
+
+Ballpark characteristics are incorporated to account for differences in offensive environments between stadiums.
+
+---
+
+## Machine Learning Models
+
+The project uses separate machine-learning models for different pitching outcomes.
+
+### Component Prediction Models
+
+| Prediction | Model |
+|---|---|
+| Strikeouts | XGBoost |
+| Outs | XGBoost |
+| Hits allowed | XGBoost |
+| Earned runs | XGBoost |
+| Walks | XGBoost |
+| Hit batters | XGBoost |
+
+A separate classifier estimates the probability that the pitcher's team wins the game.
+
+---
+
+## Model Evaluation
+
+The model is evaluated using a chronological train/test split rather than randomly mixing games from different points in the season.
+
+This better simulates the real-world prediction problem:
+
+```text
+Past games
+    |
+    v
+Training data
+    |
+    v
+Future games
+    |
+    v
+Test data
+```
+
+The current strikeout model has achieved approximately:
+
+- **MAE:** 0.96 strikeouts
+- **RMSE:** 1.34 strikeouts
+- **R²:** 0.62
+
+These values represent the model's current evaluation performance and may change after future retraining.
+
+---
+
+## Leakage Prevention
+
+A major focus of the project is preventing future information from entering predictions.
+
+Rolling and historical features are calculated using previous games rather than the current game's result.
+
+For example:
+
+```text
+Game 1 ---> Game 2 ---> Game 3 ---> Game 4
+                         |
+                         v
+                  Prediction uses
+                  Games 1-3 only
+```
+
+This prevents the model from using information that would not have been available when making an actual prediction.
+
+---
+
+## Automated Pipeline
+
+The project is designed to operate automatically.
+
+### Daily Update
+
+The daily pipeline:
+
+1. Refreshes current-season Statcast data
+2. Builds pitcher-game features
+3. Updates team features
+4. Updates opponent features
+5. Updates bullpen features
+6. Retrieves official pitching targets
+7. Loads the trained models
+8. Retrieves today's MLB schedule
+9. Retrieves tomorrow's MLB schedule
+10. Generates component predictions
+11. Generates win probabilities
+12. Calculates projected fantasy points
+13. Saves the latest predictions
+
+The resulting predictions are stored in:
+
+```text
+data/processed/latest_predictions.csv
+```
+
+---
+
+## Weekly Retraining
+
+The model is retrained automatically on a weekly schedule.
+
+Weekly retraining:
+
+1. Refreshes the current-season Statcast dataset
+2. Rebuilds the feature table
+3. Retrieves official pitching results
+4. Rebuilds team and bullpen features
+5. Trains the component prediction models
+6. Trains the win-probability classifier
+7. Evaluates the models on future data
+8. Saves the updated models and feature definitions
+
+The system intentionally **does not retrain every day**.
+
+Daily updates use the latest trained models, while model retraining occurs weekly.
 
 ---
 
@@ -66,436 +268,219 @@ Rather than stopping at model training, this project implements the complete wor
 
 ```text
 Fantasy_Pitcher_Predictor/
-│
+|
 ├── app.py
-│
-├── data/
-│   ├── raw/
-│   └── processed/
-│
-├── models/
-│   ├── xgboost.pkl
-│   └── model_features.json
-│
-├── notebooks/
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_feature_engineering.ipynb
-│   ├── 03_baseline_models.ipynb
-│   ├── 04_model_iteration.ipynb
-│   └── 05_backtesting.ipynb
-│
-├── src/
-│   ├── data_pull.py
-│   ├── features.py
-│   ├── predict.py
-│   ├── daily_update.py
-│   ├── weekly_update.py
-│   └── retraining.py
-│
+├── README.md
+├── requirements.txt
+|
 ├── .github/
 │   └── workflows/
 │       └── update.yml
-│
-├── requirements.txt
-└── README.md
+|
+├── data/
+│   ├── raw/
+│   │   └── statcast_2026.csv
+│   │
+│   └── processed/
+│       ├── latest_predictions.csv
+│       ├── pitcher_games_features_base.csv
+│       ├── pitching_targets.csv
+│       ├── team_game_features.csv
+│       └── bullpen_game_features.csv
+|
+├── models/
+│   ├── xgboost.pkl
+│   ├── outs_model.pkl
+│   ├── hits_model.pkl
+│   ├── er_model.pkl
+│   ├── bb_model.pkl
+│   ├── hbp_model.pkl
+│   ├── win_model.pkl
+│   └── model_features.json
+|
+├── notebooks/
+│   ├── exploration&feature_eng.ipynb
+│   └── model_dev.ipynb
+|
+└── src/
+    ├── data_pull.py
+    ├── features.py
+    ├── predict.py
+    ├── retraining.py
+    ├── daily_update.py
+    ├── weekly_update.py
+    ├── train.py
+    └── evaluate.py
 ```
 
 ---
 
-## Data
+## Running the Application Locally
 
-The project uses MLB Statcast data collected through `pybaseball`.
+### 1. Clone the Repository
 
-The original modeling and experimentation work was performed using historical MLB data. The deployed pipeline now operates on the **2026 MLB season**, beginning March 20, 2026.
+```bash
+git clone https://github.com/IanXiang587/Fantasy_Pitcher_Predictor.git
+cd Fantasy_Pitcher_Predictor
+```
 
-The current automated system continuously refreshes current-season Statcast data and rebuilds the modeling feature table.
+### 2. Create a Virtual Environment
 
-### Main feature groups
+```bash
+python -m venv .venv
+```
 
-#### Pitcher performance
+### 3. Activate the Environment
 
-- Strikeouts
-- Pitch count
-- Average velocity
-- Spin rate
-- Horizontal movement
-- Vertical movement
-- Whiffs
-- Called strikes
-- CSW%
+Windows:
 
-#### Recent form
+```bash
+.venv\Scripts\activate
+```
 
-Leakage-safe historical features include:
+macOS / Linux:
 
-- Previous-start performance
-- Rolling 3-game averages
-- Rolling 5-game averages
-- Season averages
-- Velocity trend
-- Strikeout variability
-- Recent CSW%
-- Recent whiffs
-- Recent called strikes
+```bash
+source .venv/bin/activate
+```
 
-#### Workload and usage
+### 4. Install Dependencies
 
-- Rest days
-- Recent pitch volume
-- Maximum times through the order
-- Starting pitcher indicator
+```bash
+pip install -r requirements.txt
+```
 
-#### Opponent offense
+### 5. Run the Streamlit Application
 
-Recent opponent metrics include:
+```bash
+streamlit run app.py
+```
 
-- Runs
-- Strikeout rate
-- Walk rate
-- Home-run rate
-- ISO
-
-#### Park factors
-
-The model includes:
-
-- Park run factor
-- Park home-run factor
-
-These allow the model to account for differences in offensive environments between ballparks.
+The application will open in a browser.
 
 ---
 
-## Feature Engineering
+## Updating Predictions Manually
 
-The feature engineering pipeline is designed around an important requirement:
+The daily prediction pipeline can be run with:
 
-> **A prediction must only use information that would have been available before the pitcher makes the start.**
-
-Rolling features are calculated chronologically so future game results cannot be incorporated into earlier predictions.
-
-The final feature table contains **84 columns**, while the deployed XGBoost model uses **49 features**.
-
-The feature table is stored at:
-
-```text
-data/processed/pitcher_games_features_base.csv
+```bash
+python -m src.daily_update
 ```
 
-The model feature list is stored at:
-
-```text
-models/model_features.json
-```
+This refreshes the current-season data and generates predictions for today's and tomorrow's games.
 
 ---
 
-## Model Development
+## Running Weekly Retraining Manually
 
-Several models were evaluated during development:
+The complete weekly pipeline can be run with:
 
-- Naive rolling-average baseline
-- Ridge regression
-- Lasso regression
-- XGBoost
-
-Random train/test splitting was intentionally avoided because the model predicts future baseball games.
-
-Instead, model evaluation follows chronological ordering:
-
-```text
-Earlier games
-     |
-     v
-Training data
-     |
-     v
-Later games
-     |
-     v
-Validation / test data
+```bash
+python -m src.weekly_update
 ```
 
-### Initial baseline
-
-```text
-MAE:  1.954
-RMSE: 2.449
-R²:   0.003
-```
-
-The baseline established a reference point using recent historical strikeout performance.
-
-### Initial model comparison
-
-| Model | MAE | RMSE | R² |
-|---|---:|---:|---:|
-| Tuned Ridge | 1.752 | 2.210 | 0.188 |
-| Lasso | 1.750 | 2.205 | 0.191 |
-| **XGBoost** | **1.743** | **2.187** | **0.204** |
-
-XGBoost produced the strongest performance during model iteration and was selected as the deployed model.
-
----
-
-## Current 2026 Model
-
-The deployed model is:
-
-```text
-XGBoost Regressor
-```
-
-with the trained pipeline stored at:
-
-```text
-models/xgboost.pkl
-```
-
-The model currently uses 49 input features.
-
-The latest automated 2026 retraining produced approximately:
-
-```text
-MAE:  0.961
-RMSE: 1.340
-R²:   0.619
-```
-
-These metrics are generated during the weekly retraining process using a chronological train/test split.
-
-Model performance can change as additional 2026 data becomes available and the model is retrained.
-
----
-
-## Historical Backtesting
-
-The model was also evaluated against a historical stretch of MLB games.
-
-The backtest produced:
-
-```text
-MAE:  1.729
-RMSE: 2.157
-R²:   0.250
-```
-
-Predictions were converted into a simple fantasy decision:
-
-```text
-Predicted Ks >= 5.0 → START
-Predicted Ks < 5.0  → SIT
-```
-
-### Backtest Results
-
-| Decision | Games | Average Actual K | 5+ K Rate |
-|---|---:|---:|---:|
-| **START** | 750 | **5.835** | **69.5%** |
-| SIT | 892 | 3.953 | 38.8% |
-| Overall | 1,642 | 4.812 | — |
-
-START recommendations averaged approximately **1.88 more actual strikeouts per game** than SIT recommendations.
-
-The START group also averaged approximately **1.02 more strikeouts than the overall backtest average**.
-
-These results indicate that the model's predictions can provide useful separation between stronger and weaker fantasy strikeout opportunities, although they should not be interpreted as guaranteed outcomes.
-
----
-
-## Automated Daily Predictions
-
-The project now refreshes predictions automatically rather than requiring the user to manually run the entire pipeline.
-
-The daily pipeline:
-
-1. Refreshes current-season Statcast data.
-2. Rebuilds the pitcher-game feature table.
-3. Loads the saved XGBoost model.
-4. Retrieves MLB schedules and probable pitchers.
-5. Generates predictions for **today**.
-6. Generates predictions for **tomorrow**.
-7. Labels each prediction as `today` or `tomorrow`.
-8. Saves the results to:
-
-```text
-data/processed/latest_predictions.csv
-```
-
-The Streamlit application reads this saved prediction file rather than recomputing the entire prediction pipeline every time the application loads.
-
----
-
-## Weekly Model Retraining
-
-The model is **not retrained every day**.
-
-A separate weekly process handles model retraining:
-
-```text
-Weekly GitHub Actions Job
-        |
-        v
-Refresh 2026 Statcast
-        |
-        v
-Rebuild feature table
-        |
-        v
-Train XGBoost
-        |
-        v
-Evaluate chronological test set
-        |
-        v
-Save model + feature list
-        |
-        v
-Generate updated predictions
-```
-
-The weekly orchestration is implemented in:
-
-```text
-src/weekly_update.py
-```
-
-The actual training process is implemented in:
-
-```text
-src/retraining.py
-```
-
-This separation keeps daily predictions fast while allowing the model to adapt to the current season on a slower cadence.
-
----
-
-## GitHub Actions Automation
-
-The pipeline is scheduled through GitHub Actions.
-
-Workflow:
-
-```text
-.github/workflows/update.yml
-```
-
-### Daily job
-
-The daily workflow runs automatically every day.
-
-It:
-
-- Checks out the repository
-- Installs Python dependencies
-- Runs `src.daily_update`
-- Commits the updated prediction file
-- Pushes the new predictions back to GitHub
-
-The workflow can also be triggered manually through GitHub Actions.
-
-### Weekly job
-
-The weekly workflow runs the retraining process on a slower cadence.
-
-It:
-
-- Refreshes current-season data
-- Rebuilds the feature table
-- Retrains XGBoost
-- Evaluates the new model
-- Saves the model
-- Generates updated predictions
-
-This architecture avoids unnecessarily retraining the model every day.
+This retrains the models and updates the supporting feature tables.
 
 ---
 
 ## Streamlit Application
 
-The Streamlit application provides two ways to use the model.
+The Streamlit application provides two primary ways to use the model.
 
-### Automated daily predictions
+### Daily Predictions
 
-The application displays:
+The application displays automatically generated predictions for:
 
-#### Today's Predictions
+- Today's games
+- Tomorrow's games
 
-Current-day probable pitchers are ranked by projected strikeouts.
+Each pitcher receives projections for the supported pitching components, win probability, and projected fantasy points.
 
-#### Tomorrow's Predictions
+### Manual Matchup
 
-Tomorrow's probable pitchers are ranked separately.
-
-Each prediction includes:
-
-- Pitcher
-- Team
-- Opponent
-- Home/Away location
-- Projected strikeouts
-- START/SIT recommendation
-
-### Manual matchup predictor
-
-The application also allows the user to select:
+Users can select:
 
 - Pitcher
 - Opponent
 - Home/Away location
 - Game date
 
-The application then constructs the appropriate matchup feature vector and sends it through the saved XGBoost model.
-
-Run locally with:
-
-```bash
-streamlit run app.py
-```
-
-The deployed Streamlit application uses the same saved prediction and model artifacts stored in the repository.
+The application then generates a custom strikeout prediction for that matchup.
 
 ---
 
-## Prediction Architecture
+## Fantasy Recommendations
+
+The application provides a simple recommendation based on projected strikeouts.
+
+Current threshold:
 
 ```text
-MLB schedule
-     |
-     v
-Probable pitchers
-     |
-     v
-Historical feature table
-     |
-     +--> Recent pitcher performance
-     +--> Velocity / spin / movement
-     +--> Opponent offense
-     +--> Rest / workload
-     +--> Park factors
-     |
-     v
-49 model features
-     |
-     v
-XGBoost
-     |
-     v
-Projected strikeouts
-     |
-     v
-START / SIT
+Projected strikeouts >= 5.0  ->  START
+Projected strikeouts < 5.0   ->  SIT
 ```
 
-The prediction logic is implemented in:
+This is intended as a simple general-purpose recommendation rather than a replacement for league-specific roster decisions.
 
-```text
-src/predict.py
-```
+---
+
+## Project Goals
+
+The long-term goal of the project is to build a reliable, automated fantasy baseball pitching prediction system that:
+
+- Uses current MLB data
+- Avoids data leakage
+- Updates automatically
+- Retrains periodically
+- Provides interpretable component-level projections
+- Supports different fantasy scoring systems
+- Provides useful matchup information
+- Can be deployed as a standalone web application
+
+---
+
+## Limitations
+
+Predictions are estimates and should not be treated as guarantees.
+
+Pitcher performance can be affected by factors that are difficult to model, including:
+
+- Unexpected injuries
+- Pitch-count restrictions
+- Changes in starting pitcher status
+- Weather
+- Lineup changes
+- Late scratches
+- Bullpen usage
+- Managerial decisions
+- Small sample sizes
+- Unpredictable game outcomes
+
+The model also depends on the availability and accuracy of external MLB data.
+
+---
+
+## Future Improvements
+
+Potential future improvements include:
+
+- Improved probable-pitcher identification
+- Weather and wind features
+- Confirmed starting-lineup information
+- Batter-level matchup features
+- Pitch-type-specific opponent performance
+- Improved calibration of win probabilities
+- More sophisticated fantasy scoring customization
+- Model comparison and ensemble methods
+- Improved uncertainty estimates
+- Expanded historical backtesting
 
 ---
 
 ## Technologies
+
+The project uses:
 
 - Python
 - pandas
@@ -503,79 +488,22 @@ src/predict.py
 - scikit-learn
 - XGBoost
 - pybaseball
+- MLB data
 - Streamlit
-- Jupyter Notebook
-- Git
 - GitHub Actions
 
 ---
 
-## Limitations
+## Author
 
-This remains a portfolio project rather than a production fantasy baseball system.
+**Ian Xiang**
 
-### Probable pitchers
-
-MLB probable pitcher information can change before game time. Predictions therefore depend on the most recently available schedule information.
-
-### Player and team changes
-
-Mid-season trades, roster changes, injuries, and changes in pitcher roles can affect model accuracy.
-
-### Park factors
-
-Park factors are treated as environmental adjustments rather than dynamically estimated for every individual game.
-
-### Fantasy scoring
-
-The START/SIT recommendation uses a simple 5-strikeout threshold. It does not model a specific league's scoring system, roster construction, replacement level, or category needs.
-
-### Model uncertainty
-
-Strikeout totals remain noisy. Even a strong model cannot account for every factor affecting a single baseball game.
-
-### Current-season performance
-
-The 2026 model will continue to change as additional games become available and weekly retraining incorporates new information.
+Fantasy Pitcher Predictor is a personal machine-learning project focused on applying data science and predictive modeling to fantasy baseball.
 
 ---
 
-## Future Improvements
+## Disclaimer
 
-Potential future work includes:
+This project is for educational and analytical purposes.
 
-- Batter-level matchup features
-- Confirmed starting lineup information
-- Batter handedness splits
-- Pitcher-vs-team history
-- Bullpen usage
-- Weather and temperature
-- Betting strikeout lines
-- Prediction confidence intervals
-- Fantasy scoring projections
-- League-specific START/SIT thresholds
-- Improved model calibration
-- Additional time-based cross-validation
-- More advanced ensemble models
-
----
-
-## Conclusion
-
-This project demonstrates an end-to-end machine learning workflow applied to a practical fantasy baseball problem.
-
-The system goes beyond model training by implementing:
-
-- MLB Statcast data ingestion
-- Leakage-safe feature engineering
-- Time-based model evaluation
-- Historical backtesting
-- XGBoost prediction
-- Automated daily predictions
-- Weekly model retraining
-- GitHub Actions scheduling
-- Streamlit deployment
-
-The current system produces strikeout predictions for both **today and tomorrow**, while the underlying model is periodically retrained as the 2026 MLB season progresses.
-
-The project therefore demonstrates not only predictive modeling, but also the engineering required to turn a machine-learning experiment into an automated application.
+Predictions are generated by machine-learning models and should not be considered guaranteed outcomes or financial advice.
