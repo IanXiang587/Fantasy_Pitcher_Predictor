@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,31 +44,42 @@ jobs:
 
       - name: Run weekly retraining
         if: >
-          github.event_name == 'schedule' &&
-          github.event.schedule == '0 12 * * 1' ||
-          github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.update_type == 'weekly'
+          (github.event_name == 'schedule' &&
+          github.event.schedule == '0 12 * * 1') ||
+          (github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.update_type == 'weekly')
         run: |
           python -m src.weekly_update
 
       - name: Run daily update
         if: >
-          github.event_name == 'schedule' &&
-          github.event.schedule == '0 11 * * *' ||
-          github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.update_type == 'daily'
+          (github.event_name == 'schedule' &&
+          github.event.schedule == '0 11 * * *') ||
+          (github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.update_type == 'daily')
         run: |
           python -m src.daily_update
 
-      - name: Commit updated data, predictions, and model
+      - name: Commit updated data and models
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add data/processed/latest_predictions.csv
           git add data/processed/pitcher_games_features_base.csv
+          git add data/processed/team_game_features.csv
+          git add data/processed/bullpen_game_features.csv
+          git add data/processed/pitching_targets.csv
+
           git add models/xgboost.pkl
+          git add models/outs_model.pkl
+          git add models/hits_model.pkl
+          git add models/er_model.pkl
+          git add models/bb_model.pkl
+          git add models/hbp_model.pkl
+          git add models/win_model.pkl
           git add models/model_features.json
+          git add models/win_model_features.json
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
